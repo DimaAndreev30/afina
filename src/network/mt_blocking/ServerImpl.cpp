@@ -30,7 +30,8 @@ namespace MTblocking {
 // See Server.h
 ServerImpl::ServerImpl(std::shared_ptr<Afina::Storage> ps, std::shared_ptr<Logging::Service> pl)
     : Server(ps, pl)
-    , _n_workers(0) {}
+    , _n_workers(0)
+{}
 
 // See Server.h
 ServerImpl::~ServerImpl() {}
@@ -128,7 +129,12 @@ void ServerImpl::OnRun() {
 
 
         if (_n_workers < _workers_limit) {
-            auto newThread = std::thread(&ServerImpl::Worker, this, client_socket);
+            {
+                std::lock_guard<std::mutex> lock(_set_mutex);
+                ++_n_workers;
+                _active_client_sockets.insert(client_socket);
+            }
+            std::thread(&ServerImpl::Worker, this, client_socket).detach();
         }
         else {
             close(client_socket);
@@ -143,6 +149,19 @@ void ServerImpl::OnRun() {
             close(client_socket);
         }*/
     }
+
+
+    {
+        std::unique_lock<std::mutex> lock(_set_mutex);
+        for (auto it : _active_client_sockets) {
+            shutdown(it, SHUT_RD);
+        }
+        _active_client_sockets.clear();
+        while (_n_workers > 0) {
+            _workers_stop.wait(lock);
+        }
+    }
+
 
     // Cleanup on exit...
     _logger->warn("Network stopped");
@@ -250,6 +269,15 @@ void ServerImpl::Worker(int client_socket) {
         _logger->error("Failed to process connection on descriptor {}: {}", client_socket, ex.what());
     }
 
+
+    {
+        std::lock_guard<std::mutex> lock(_set_mutex);
+        _active_client_sockets.erase(client_socket);
+        --_n_workers;
+    }
+    if (_n_workers == 0) {
+        _workers_stop.notify_one();
+    }
     close(client_socket);
 }
 

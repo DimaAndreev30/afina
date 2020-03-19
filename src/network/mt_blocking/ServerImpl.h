@@ -1,8 +1,12 @@
 #ifndef AFINA_NETWORK_MT_BLOCKING_SERVER_H
 #define AFINA_NETWORK_MT_BLOCKING_SERVER_H
 
+#include <mutex>
+#include <condition_variable>
 #include <atomic>
 #include <thread>
+
+#include <set>
 
 #include <afina/network/Server.h>
 
@@ -43,6 +47,10 @@ private:
 
     int _workers_limit;
     int _n_workers;
+
+    std::set<int> _active_client_sockets;
+    std::mutex _set_mutex;
+    std::condition_variable _workers_stop;
 
     // Logger instance
     std::shared_ptr<spdlog::logger> _logger;
