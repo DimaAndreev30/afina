@@ -39,6 +39,11 @@ protected:
     void OnRun();
 
 private:
+    void Worker(int client_socket);
+
+    int _workers_limit;
+    int _n_workers;
+
     // Logger instance
     std::shared_ptr<spdlog::logger> _logger;
 
