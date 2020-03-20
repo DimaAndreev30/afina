@@ -129,6 +129,7 @@ void SimpleLRU::insertValue(const std::string &key, const std::string &value) {
 void SimpleLRU::resetValue(lru_node &node, const std::string &value) {
     setHead(node);
 
+    _remains += node.value.size() - value.size();
     while(_remains < 0) {
         dropTail();
     }
